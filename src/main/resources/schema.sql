@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS portfolio_content (
+    id TINYINT PRIMARY KEY,
+    content_json JSON NOT NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT portfolio_content_singleton CHECK (id = 1)
+);
