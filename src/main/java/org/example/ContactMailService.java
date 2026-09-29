@@ -3,56 +3,65 @@ package org.example;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.MailAuthenticationException;
-import org.springframework.mail.MailException;
-import org.springframework.mail.MailSendException;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @Service
 public class ContactMailService {
     private static final Logger logger = LoggerFactory.getLogger(ContactMailService.class);
 
-    private final JavaMailSender mailSender;
+    private final RestTemplate restTemplate;
     private final String sender;
     private final String recipient;
+    private final String resendApiKey;
 
     public ContactMailService(
-            JavaMailSender mailSender,
+            RestTemplate restTemplate,
             @Value("${portfolio.contact.sender}") String sender,
-            @Value("${portfolio.contact.recipient}") String recipient) {
-        this.mailSender = mailSender;
+            @Value("${portfolio.contact.recipient}") String recipient,
+            @Value("${resend.api.key}") String resendApiKey) {
+        this.restTemplate = restTemplate;
         this.sender = sender;
         this.recipient = recipient;
+        this.resendApiKey = resendApiKey;
     }
 
     public void send(String name, String replyTo, String phone, String message) {
-        var email = new SimpleMailMessage();
-        email.setFrom(sender);
-        email.setTo(recipient);
-        email.setReplyTo(replyTo);
-        email.setSubject("Portfolio enquiry from " + name);
-        email.setText("""
-                Name: %s
-                Email: %s
-                Phone: %s
+        String url = "https://api.resend.com/emails";
 
-                Message:
-                %s
-                """.formatted(name, replyTo, phone == null || phone.isBlank() ? "Not provided" : phone, message));
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(resendApiKey);
+
+        String emailHtml = """
+                <p><strong>Name:</strong> %s</p>
+                <p><strong>Email:</strong> %s</p>
+                <p><strong>Phone:</strong> %s</p>
+                <p><strong>Message:</strong><br>%s</p>
+                """.formatted(name, replyTo, phone == null || phone.isBlank() ? "Not provided" : phone, message);
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("from", sender);
+        body.put("to", List.of(recipient));
+        body.put("subject", "Portfolio enquiry from " + name);
+        body.put("html", emailHtml);
+        body.put("reply_to", replyTo);
+
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
 
         try {
-            mailSender.send(email);
-        } catch (MailAuthenticationException exception) {
-            logger.error("Contact email authentication failed. Verify the Resend SMTP API key.", exception);
-            throw exception;
-        } catch (MailSendException exception) {
-            logger.error("Contact email delivery failed. Verify SMTP connectivity and the sender domain.", exception);
-            throw exception;
-        } catch (MailException exception) {
-            logger.error("Contact email transport failed.", exception);
-            throw exception;
+            restTemplate.postForEntity(url, request, String.class);
+            logger.info("Contact email sent successfully via Resend HTTP API to {}", recipient);
+        } catch (Exception exception) {
+            logger.error("Contact email delivery failed via Resend HTTP API.", exception);
+            throw new RuntimeException("Failed to send email", exception);
         }
     }
 }
