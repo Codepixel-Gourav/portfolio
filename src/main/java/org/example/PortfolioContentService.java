@@ -24,8 +24,9 @@ public class PortfolioContentService {
 
     @PostConstruct
     void seedInitialContent() {
+        // PostgreSQL ke liye INSERT ... ON CONFLICT syntax use kiya gaya hai
         jdbc.update(
-                "INSERT IGNORE INTO portfolio_content (id, content_json) VALUES (1, ?)",
+                "INSERT INTO portfolio_content (id, content_json) VALUES (1, ?) ON CONFLICT (id) DO NOTHING",
                 serialize(defaultContent()));
     }
 
