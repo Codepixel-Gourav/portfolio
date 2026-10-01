@@ -24,9 +24,9 @@ public class PortfolioContentService {
 
     @PostConstruct
     void seedInitialContent() {
-        // PostgreSQL ke liye INSERT ... ON CONFLICT syntax use kiya gaya hai
+        // PostgreSQL jsonb cast (?::jsonb) added here
         jdbc.update(
-                "INSERT INTO portfolio_content (id, content_json) VALUES (1, ?) ON CONFLICT (id) DO NOTHING",
+                "INSERT INTO portfolio_content (id, content_json) VALUES (1, ?::jsonb) ON CONFLICT (id) DO NOTHING",
                 serialize(defaultContent()));
     }
 
@@ -163,7 +163,8 @@ public class PortfolioContentService {
     }
 
     private void save(PortfolioContent content) {
-        jdbc.update("UPDATE portfolio_content SET content_json = ? WHERE id = 1", serialize(content));
+        // PostgreSQL jsonb cast (?::jsonb) added here as well
+        jdbc.update("UPDATE portfolio_content SET content_json = ?::jsonb WHERE id = 1", serialize(content));
     }
 
     private String serialize(PortfolioContent content) {
